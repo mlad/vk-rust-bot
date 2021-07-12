@@ -29,15 +29,15 @@ func (v *Vk) Request(method string, params url.Values) (response gjson.Result, e
 	params.Add("access_token", v.accessToken)
 	params.Add("v", v.version)
 
-	resp, err := http.PostForm("https://api.vk.com/method/"+method, params)
+	resp, err := http.PostForm(fmt.Sprintf("https://api.vk.com/method/%s", method), params)
 	if err != nil {
 		return gjson.Result{}, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
-		return gjson.Result{}, errors.New("incorrect http code: " + strconv.Itoa(resp.StatusCode))
+	if resp.StatusCode != http.StatusOK {
+		return gjson.Result{}, fmt.Errorf("bad http code: %d", resp.StatusCode)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
@@ -95,7 +95,7 @@ func (v *Vk) GroupPoll(groupId string, event func(vk *Vk, message gjson.Result))
 		lp := vkLongPollServer{}
 
 		for {
-			// Обновление данных о Long Poll сервера
+			// Update Long Poll data
 
 			if len(lp.Key) == 0 {
 				response, err := v.Request("groups.getLongPollServer", url.Values{"group_id": {groupId}})
@@ -111,10 +111,10 @@ func (v *Vk) GroupPoll(groupId string, event func(vk *Vk, message gjson.Result))
 				lp.Server = response.Get("server").Str
 				lp.Key = response.Get("key").Str
 
-				log.Println("Получен новый Long Poll сервер")
+				log.Println("Long Poll server updated")
 			}
 
-			// Пуллинг сервера
+			// Long Poll request
 
 			resp1, err := http.Get(fmt.Sprintf("%s?act=a_check&key=%s&ts=%s&wait=25", lp.Server, lp.Key, lp.Ts))
 			if err != nil {
@@ -133,7 +133,7 @@ func (v *Vk) GroupPoll(groupId string, event func(vk *Vk, message gjson.Result))
 
 			updates := gjson.GetBytes(body, "updates")
 
-			// Обработка ошибок Long Poll
+			// Long Poll error handling
 
 			if !updates.Exists() {
 				failedCode := gjson.GetBytes(body, "failed")
@@ -143,11 +143,11 @@ func (v *Vk) GroupPoll(groupId string, event func(vk *Vk, message gjson.Result))
 				}
 
 				switch failedCode.Int() {
-				case 1: // история событий устарела или была частично утеряна
+				case 1: // history expired or lost
 					lp.Ts = gjson.GetBytes(body, "ts").Str
-				case 2: // истекло время действия ключа
+				case 2: // key expired
 					lp.Key = ""
-				case 3: // информация утрачена
+				case 3: // data lost
 					lp.Key = ""
 					lp.Ts = ""
 				default:

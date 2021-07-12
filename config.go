@@ -6,38 +6,48 @@ import (
 	"os"
 )
 
-const configFilePath string = "config.json"
-
-type Config struct {
-	Token   string `json:"token"`
-	Version string `json:"version"`
-	GroupId string `json:"group_id"`
+type ConfigData struct {
+	Token          string   `json:"token"`
+	GroupId        string   `json:"group_id"`
+	StartCommands  []string `json:"start_commands"`
+	WelcomeMessage string   `json:"welcome_message"`
 }
 
-func readConfig(path string) (*Config, error) {
-	cfg := new(Config)
+func ConfigNew(path string) error {
+	cfg := &ConfigData{
+		Token:          "TO BE FILLED",
+		GroupId:        "TO BE FILLED",
+		StartCommands:  []string{"start", "begin", "hello"},
+		WelcomeMessage: "Welcome!\nSend message \"hello\" to get started.",
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	if err = json.NewEncoder(f).Encode(cfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ConfigRead(path string) (*ConfigData, error) {
+	cfg := new(ConfigData)
 
 	f, err := os.Open(path)
 	if err != nil {
-		// Файл не создан. Создаем
 		if os.IsNotExist(err) {
-			f, err = os.Create(path)
-			if err != nil {
-				return nil, err
+			if err = ConfigNew(path); err == nil {
+				return nil, errors.New("config file created, fill it")
 			}
-			defer f.Close()
-
-			if err = json.NewEncoder(f).Encode(cfg); err != nil {
-				return nil, err
-			}
-
-			return nil, errors.New("new config was created, fill it")
 		}
 
-		// Файл создан. Какая-то другая ошибка
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err = json.NewDecoder(f).Decode(cfg); err != nil {
 		return nil, err

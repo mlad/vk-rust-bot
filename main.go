@@ -1,12 +1,5 @@
 package main
 
-/*
-
-TODO:
--- Мьютексы для апдейтера серверов
-
-*/
-
 import (
 	"encoding/json"
 	"github.com/tidwall/gjson"
@@ -16,10 +9,14 @@ import (
 	"time"
 )
 
+const ConfigFilePath string = "config.json"
+const ServersFilePath string = "server.tsv"
+const VkApiVersion = "5.85"
+
+var Config *ConfigData
 var VkCommands map[string]func(vk *Vk, object *LongPollMessage)
 
 func onLongPollMessage(vk *Vk, object gjson.Result) {
-	// todo: исправить кашу с типами данных
 	msg := new(LongPollMessage)
 	_ = json.Unmarshal([]byte(object.Raw), msg)
 
@@ -32,32 +29,35 @@ func onLongPollMessage(vk *Vk, object gjson.Result) {
 		return
 	}
 
-	if strings.EqualFold(msg.Text, "старт") || strings.EqualFold(msg.Text, "привет") || strings.EqualFold(msg.Text, "начать") {
-		CommandStart(vk, msg)
-	} else {
-		vk.SendMessage(msg.FromId, "Привет! 👋\nЭто бот сообщества LIVE RUST\n\n❗ Если у тебя нет меню, отправь текст \"старт\"")
+	for _, i := range Config.StartCommands {
+		if strings.EqualFold(msg.Text, i) {
+			CommandStart(vk, msg)
+			return
+		}
 	}
+
+	vk.SendMessage(msg.FromId, Config.WelcomeMessage)
 }
 
 func CommandStart(vk *Vk, object *LongPollMessage) {
 	kb := VkKeyboard{OneTime: false}
 
-	kb.AddRow(kb.TxtBtn("🔍 Подобрать Rust сервер", "secondary", `{"command":"rustFind"}`))
-	kb.AddRow(kb.TxtBtn("📣 Реклама в LIVE RUST", "secondary", `{"command":"ads"}`))
+	kb.AddRow(kb.TxtBtn("🔍 Find Rust servers", "secondary", `{"command":"rustFind"}`))
+	kb.AddRow(kb.TxtBtn("📣 Example command", "secondary", `{"command":"example"}`))
 
-	vk.SendKeyboard(object.FromId, "Выбери действие в меню", &kb)
+	vk.SendKeyboard(object.FromId, "Select a menu item:", &kb)
 }
 
-func CommandAds(vk *Vk, object *LongPollMessage) {
-	vk.SendMessage(object.FromId, "По рекламным вопросам обращайтесь в [liveadv|LIVE AD]")
+func CommandExample(vk *Vk, object *LongPollMessage) {
+	vk.SendMessage(object.FromId, "Example command response")
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	cfg, err := readConfig(configFilePath)
-	if err != nil {
-		log.Fatalf("Read config error: %v\n", err)
+	var err error
+	if Config, err = ConfigRead(ConfigFilePath); err != nil {
+		log.Fatalf("Config read error: %s\n", err.Error())
 	}
 
 	LoadRustServers()
@@ -65,13 +65,11 @@ func main() {
 	VkCommands = map[string]func(vk *Vk, object *LongPollMessage){
 		"start":    CommandStart,
 		"rustFind": CommandRustFind,
-		"ads":      CommandAds,
+		"example":  CommandExample,
 	}
 
-	vk := Vk{accessToken: cfg.Token, version: cfg.Version}
-	vk.GroupPoll(cfg.GroupId, onLongPollMessage)
-
-	RunApiServer()
+	vk := Vk{accessToken: Config.Token, version: VkApiVersion}
+	vk.GroupPoll(Config.GroupId, onLongPollMessage)
 
 	ch := make(chan int)
 	<-ch

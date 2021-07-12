@@ -39,13 +39,13 @@ const (
 func (server *RustServerInfo) UpdateInfo() {
 	conn, err := net.Dial("udp", server.Address)
 	if err != nil {
-		fmt.Printf("Update server %s error #1: %v\n", server.Address, err)
+		fmt.Printf("Update server %s dial error: %s\n", server.Address, err.Error())
 		return
 	}
 
 	_, err = conn.Write([]byte("\xFF\xFF\xFF\xFFTSource Engine Query\x00"))
 	if err != nil {
-		fmt.Printf("Update server %s error #2: %v\n", server.Address, err)
+		fmt.Printf("Update server %s write error: %s\n", server.Address, err.Error())
 		return
 	}
 
@@ -96,9 +96,16 @@ func (server *RustServerInfo) UpdateInfo() {
 }
 
 func LoadRustServers() {
-	fp, err := os.Open("server.csv")
+	fp, err := os.Open(ServersFilePath)
 	if err != nil {
-		panic("cannot read server list from file")
+		if os.IsNotExist(err) {
+			log.Fatalf("Server list file not found!\n"+
+				"Create file \"%s\" and fill it with the following structure:\n"+
+				"IP:PORT<TAB>TEAM_PLAYERS<TAB>RATES<TAB>WIPE_INTERVAL<TAB>GENRE<NEW LINE>\n"+
+				"(Each server on a new line)\n"+
+				"Genres: m=modded, c=classic, f=fun\n", ServersFilePath)
+		}
+		log.Fatalf("Server list open error: %s\n", err.Error())
 	}
 
 	reader := csv.NewReader(fp) // address,max_players,rate,wipe_interval
@@ -107,7 +114,7 @@ func LoadRustServers() {
 
 	data, err := reader.ReadAll()
 	if err != nil {
-		panic("server list struct is incorrect")
+		log.Fatalf("Server list struct error: %s\n", err.Error())
 	}
 
 	RustServers = make([]RustServerInfo, len(data))
@@ -136,8 +143,8 @@ func LoadRustServers() {
 
 func RunRustServerUpdate() {
 	go func() {
-		filter1 := regexp.MustCompile("([^ ])\\|([^ ])")                // Фильтр ссылок на страницы ВК
-		filter2 := regexp.MustCompile("([\\w-]+)\\.(ru|RU|su|com|net)") // Фильтр ссылок на сайты
+		filter1 := regexp.MustCompile("([^ ])\\|([^ ])")                // Filter links to VK pages
+		filter2 := regexp.MustCompile("([\\w-]+)\\.(ru|RU|su|com|net)") // Filter site links
 
 		ch := make(chan bool, 10)
 		tm := time.NewTicker(30 * time.Second)

@@ -22,11 +22,11 @@ type ServerSearchAnswer struct {
 }
 
 var ServerSearchAnswers = [...]ServerSearchAnswer{
-	{Message: "Какого жанра сервер ты хочешь?", Variants: []string{"Моды", "Классика", "Развлекательные"},
+	{Message: "Server genre?", Variants: []string{"Modded", "Classic", "Fun"},
 		Checker: func(answer int, s *RustServerInfo) bool {
 			return answer == s.Rate
 		}},
-	{Message: "Какие рейты ты хочешь?", Variants: []string{"x1 (стандарт  классики)", "x2 - x3 (стандарт модов)", "x4 - x9 (быстрая игра)", "x10 и выше"},
+	{Message: "Server rates?", Variants: []string{"x1 (classic)", "x2 - x3 (mods)", "x4 - x9 (fast play)", "x10 and higher"},
 		Checker: func(answer int, s *RustServerInfo) bool {
 			switch answer {
 			case 1:
@@ -41,7 +41,7 @@ var ServerSearchAnswers = [...]ServerSearchAnswer{
 				return false
 			}
 		}},
-	{Message: "Сколько игроков в твоей команде?", Variants: []string{"1", "2 - 3", "4 - 5", "6 и более (клан)"},
+	{Message: "How many players are on your team?", Variants: []string{"1", "2 - 3", "4 - 5", "6 and more (clan)"},
 		Checker: func(answer int, s *RustServerInfo) bool {
 			if s.Genre == GenreClassic && s.MaxTeam == 100 { // На классике без ограничения лимита не проверяем
 				return true
@@ -60,7 +60,7 @@ var ServerSearchAnswers = [...]ServerSearchAnswer{
 				return false
 			}
 		}},
-	{Message: "Какая карта должна быть на сервере?", Variants: []string{"Любая", "Procedural", "Barren", "Hapis Island"},
+	{Message: "Server map?", Variants: []string{"Any", "Procedural", "Barren", "Hapis Island"},
 		Checker: func(answer int, s *RustServerInfo) bool {
 			switch answer {
 			case 1:
@@ -75,7 +75,7 @@ var ServerSearchAnswers = [...]ServerSearchAnswer{
 				return false
 			}
 		}},
-	{Message: "Насколько часто должен быть вайп?", Variants: []string{"Без разницы", "Каждые 3-5 дней", "Каждые 7 дней", "Каждые 14 дней"},
+	{Message: "Wipe interval?", Variants: []string{"Any", "Every 3-5 days", "Every 7 days", "Every 14 days"},
 		Checker: func(answer int, s *RustServerInfo) bool {
 			switch answer {
 			case 1:
@@ -93,7 +93,7 @@ var ServerSearchAnswers = [...]ServerSearchAnswer{
 }
 
 func (server *RustServerInfo) CheckParams(genre byte, params ...int) bool {
-	if server.MaxPlayers == 0 { // Сервер оффлайн
+	if server.MaxPlayers == 0 { // Server is offline
 		return false
 	}
 
@@ -122,7 +122,7 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 		return
 	}
 
-	// Проверка номера этапа
+	// Check step id
 
 	step := payload.Step
 
@@ -130,7 +130,7 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 		return
 	}
 
-	// Если был выбран ответ (т.е не первый вывод меню)
+	// An answer was chosen (i.e not first menu page)
 
 	if payload.Answer != 0 && step != len(ServerSearchAnswers) {
 		if payload.Answer < 1 || payload.Answer > len(ServerSearchAnswers[step].Variants) {
@@ -143,11 +143,11 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 		step++
 
 		if step == 1 {
-			if payload.Answer == 2 { // Классика, пропускаем этап выбора рейтов
+			if payload.Answer == 2 { // Classics, skip rate selection page
 				payload.Data = append(payload.Data, 1)
 				payload.Step++
 				step++
-			} else if payload.Answer == 3 { // Развлекательные, пропускаем остальные этапы
+			} else if payload.Answer == 3 { // Fun, skip all next pages
 				payload.Data = append(payload.Data, 0, 0, 0, 0)
 				payload.Step = len(ServerSearchAnswers)
 				step = payload.Step
@@ -155,7 +155,7 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 		}
 	}
 
-	// Все вопросы обработаны. Ищем сервер
+	// All questions have been processed. Looking for a server
 
 	if step == len(ServerSearchAnswers) {
 
@@ -176,28 +176,28 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 
 		resp := strings.Builder{}
 		if len(good) != 0 {
-			// Перемешиваем найденные сервера
+			// Shuffle founded servers
 
 			rand.Shuffle(len(good), func(i, j int) { good[i], good[j] = good[j], good[i] })
 
-			// Стараемся вывести сервера от разных проектов
+			// Trying to show servers from different projects
 
 			unique := make(map[uint32]bool)
 			count := len(good)
 
-			gFinal := [3]*RustServerInfo{} // Финальный список. Три сервера, которые будут выведены
-			fPtr := 0                      // Счетчик для финального списка
+			gFinal := [3]*RustServerInfo{} // Final list. Three servers that will be shown
+			fPtr := 0                      // Counter for the final list
 
 			for i := 0; i < count; i++ {
 				s := good[i]
 				if _, ok := unique[s.Key]; !ok {
-					unique[s.Key] = true // Отмечаем, что сервер от проекта добавлен
+					unique[s.Key] = true
 
-					// "Удаляем" элемент из среза
+					// Delete element from slice
 					good[i], good[count-1] = good[count-1], good[i]
 					count--
 
-					// Добавляем элемент в финальный список
+					// Add element to final array
 					gFinal[fPtr] = s
 					fPtr++
 					if fPtr == 3 {
@@ -206,7 +206,7 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 				}
 			}
 
-			for ; fPtr < 3; fPtr++ { // todo: заменить на " fPtr++ < 3 " ?
+			for ; fPtr < 3; fPtr++ {
 				if count == 0 {
 					break
 				}
@@ -214,35 +214,35 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 
 				gFinal[fPtr] = good[j]
 
-				// "Удаляем" элемент из среза. Чтобы в очередной раз не выбрать тот же
+				// Remove element from slice
 				good[j], good[count-1] = good[count-1], good[j]
 				count--
 			}
 
-			// Вывод списка найденных сервероа
+			// Show found servers
 
-			resp.WriteString("🔍 По выбранным параметрам найдены сервера:\n\n")
+			resp.WriteString("🔍 Found servers::\n\n")
 
 			for i := 0; i < fPtr; i++ {
 				j := gFinal[i]
-				resp.WriteString(fmt.Sprintf("▶ connect %s\n%s\nОнлайн %d / %d -- Вайп %s\n\n",
-					j.Address, j.Hostname, j.Players, j.MaxPlayers, time.Unix(j.Wiped, 0).Format("02.01 в 15:04")))
+				resp.WriteString(fmt.Sprintf("▶ connect %s\n%s\nPlayers %d / %d -- Wiped %s\n\n",
+					j.Address, j.Hostname, j.Players, j.MaxPlayers, time.Unix(j.Wiped, 0).Format("02.01 at 15:04")))
 			}
 		} else {
-			resp.WriteString("😢 Ничего не найдено. Попробуй другие параметры")
+			resp.WriteString("😢 Nothing found. Try other parameters")
 		}
 
 		if len(good) > 3 {
 			pl, _ := json.Marshal(payload)
-			kb.AddRow(kb.TxtBtn("🔄 Покажите другие сервера", "secondary", string(pl)))
+			kb.AddRow(kb.TxtBtn("🔄 Show other servers", "secondary", string(pl)))
 		}
-		kb.AddRow(kb.TxtBtn("🔍 Попробовать снова", "secondary", `{"command":"rustFind"}`))
-		kb.AddRow(kb.TxtBtn("🏠 Вернуться на главную", "positive", `{"command":"start"}`))
+		kb.AddRow(kb.TxtBtn("🔍 Try again", "secondary", `{"command":"rustFind"}`))
+		kb.AddRow(kb.TxtBtn("🏠 Main page", "positive", `{"command":"start"}`))
 		vk.SendKeyboard(object.FromId, resp.String(), &kb)
 		return
 	}
 
-	// Выводим очередные варианты ответов на вопрос
+	// Display next parameters for answers to the question
 
 	count := len(ServerSearchAnswers[step].Variants)
 	buttons := make([]VkButton, 0, count)
@@ -300,6 +300,6 @@ func CommandRustFind(vk *Vk, object *LongPollMessage) {
 		}
 	}
 
-	kb.AddRow(kb.TxtBtn("🏠 Вернуться на главную", "positive", `{"command":"start"}`))
+	kb.AddRow(kb.TxtBtn("🏠 Main page", "positive", `{"command":"start"}`))
 	vk.SendKeyboard(object.FromId, ServerSearchAnswers[step].Message, &kb)
 }
