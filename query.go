@@ -101,7 +101,7 @@ func LoadRustServers() {
 		if os.IsNotExist(err) {
 			log.Fatalf("Server list file not found!\n"+
 				"Create file \"%s\" and fill it with the following structure:\n"+
-				"IP:PORT<TAB>TEAM_PLAYERS<TAB>RATES<TAB>WIPE_INTERVAL<TAB>GENRE<NEW LINE>\n"+
+				"IP:PORT<TAB>TEAM_PLAYERS<TAB>RATES<TAB>WIPE_INTERVAL<TAB>GENRE<TAB>PROJECT_NAME<NEW LINE>\n"+
 				"(Each server on a new line)\n"+
 				"Genres: m=modded, c=classic, f=fun\n", ServersFilePath)
 		}
